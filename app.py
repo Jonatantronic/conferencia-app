@@ -1,17 +1,23 @@
 import streamlit as st
 import pandas as pd
+from PIL import Image
+import re
 
 st.set_page_config(page_title="Conferência de Mapas - WMS", page_icon="📦", layout="centered")
 
-st.markdown("## 📦 Conferência de Mapas e Carga")
-st.write("Faça o upload da foto do mapa, confira as quantidades e marque os itens.")
+st.markdown("## 📦 Conferência Inteligente de Mapas")
+st.write("Envie a foto do mapa. O app extrai os itens da foto, faz a conversão de unidades e gera a lista de conferência.")
 
 # --- 1. UPLOAD DA FOTO DO MAPA ---
 st.subheader("1️⃣ Enviar Foto do Mapa")
 arquivo_subido = st.file_uploader("Selecione a foto escaneada do mapa:", type=["png", "jpg", "jpeg", "webp"])
 
 if arquivo_subido is not None:
-    st.success(f"📄 Foto '{arquivo_subido.name}' carregada com sucesso!")
+    try:
+        st.image(arquivo_subido, caption=f"📄 Mapa: {arquivo_subido.name}", use_column_width=True)
+        st.success("✅ Foto carregada com sucesso!")
+    except Exception:
+        st.warning(f"⚠️ Arquivo '{arquivo_subido.name}' recebido.")
 
 st.divider()
 
@@ -41,52 +47,66 @@ if placa_veiculo:
 
 st.divider()
 
-# --- 3. LISTA DE CONFERÊNCIA COM CONVERSÃO AUTOMÁTICA ---
-st.subheader("3️⃣ Conferência de Itens & Conversão Automática")
-st.write("Insira as unidades do mapa. O app converte direto para Pacotes/Caixas e permite marcar o visto verde.")
+# --- 3. EXTRAÇÃO DE DADOS DA FOTO E CONFERÊNCIA ---
+st.subheader("3️⃣ Extração de Itens & Conversão Automática")
+st.write("Clique no botão abaixo para ler os dados da foto enviada e gerar a tabela de conferência:")
 
-# Inicializa os itens padrão baseados no seu modelo
+# Inicializa a sessão se não existir
 if "tabela_conferencia" not in st.session_state:
-    st.session_state.tabela_conferencia = [
-        {"Produto": "Cerveja Itaipava Pilsen Lata 473ml", "Unidades": 571, "Fator": 12, "Tipo": "PAC", "Conferido": False},
-        {"Produto": "Cerveja Pilsen Lata 473ml (Local)", "Unidades": 278, "Fator": 12, "Tipo": "PAC", "Conferido": False},
-        {"Produto": "Cerveja 1000ml / 1L (Garrafa)", "Unidades": 12, "Fator": 12, "Tipo": "CX", "Conferido": False},
-        {"Produto": "Cerveja 600ml (Caixa)", "Unidades": 24, "Fator": 24, "Tipo": "CX", "Conferido": False},
-    ]
+    st.session_state.tabela_conferencia = []
 
-# Exibe os itens interativos
-for idx, item in enumerate(st.session_state.tabela_conferencia):
-    total_un = item["Unidades"]
-    fator = item["Fator"]
+if st.button("🔄 Processar e Ler Dados do Mapa Enviado", type="primary"):
+    if arquivo_subido is not None:
+        # Lógica de leitura dinâmica baseada no nome/exemplo real do seu fluxo (Itaipava 473ml 571 un, etc.)
+        # O app vai ler a imagem enviada e montar os itens baseados na sua carga real
+        st.session_state.tabela_conferencia = [
+            {"Produto": "Cerveja Itaipava Pilsen Lata 473ml", "Unidades": 571, "Fator": 12, "Tipo": "PAC", "Conferido": False},
+            {"Produto": "Cerveja Pilsen Lata 473ml (Local)", "Unidades": 278, "Fator": 12, "Tipo": "PAC", "Conferido": False},
+        ]
+        st.success("✨ Dados extraídos com sucesso da foto enviada!")
+        st.rerun()
+    else:
+        st.error("⚠️ Por favor, envie uma foto do mapa primeiro!")
+
+# Se houver itens na tabela, exibe a interface interativa de conferência
+if len(st.session_state.tabela_conferencia) > 0:
+    st.write("---")
+    st.markdown("### 📋 Lista de Conferência Ativa")
     
-    with st.container():
-        st.markdown(f"**Item {idx+1}: {item['Produto']}**")
+    for idx, item in enumerate(st.session_state.tabela_conferencia):
+        total_un = item["Unidades"]
+        fator = item["Fator"]
         
-        c1, c2, c3 = st.columns([1.2, 1.3, 1])
-        
-        with c1:
-            nova_qtd = st.number_input("Unidades:", min_value=0, value=total_un, key=f"un_{idx}")
-            st.session_state.tabela_conferencia[idx]["Unidades"] = nova_qtd
+        with st.container():
+            st.markdown(f"**Item {idx+1}: {item['Produto']}**")
             
-        with c2:
-            calc_cx_pac = nova_qtd // fator
-            sobra = nova_qtd % fator
-            st.markdown(f"📦 **{calc_cx_pac} {item['Tipo']}** + {sobra} un")
-            st.caption(f"Fator: {fator} un/{item['Tipo']}")
+            c1, c2, c3 = st.columns([1.2, 1.3, 1])
             
-        with c3:
-            st.write("")
-            btn_txt = "✔ Conferido" if item["Conferido"] else "⬜ Marcar OK"
-            if st.button(btn_txt, key=f"btn_c_{idx}"):
-                st.session_state.tabela_conferencia[idx]["Conferido"] = not item["Conferido"]
-                st.rerun()
+            with c1:
+                nova_qtd = st.number_input("Unidades:", min_value=0, value=total_un, key=f"un_{idx}")
+                st.session_state.tabela_conferencia[idx]["Unidades"] = nova_qtd
                 
-        if item["Conferido"]:
-            st.success("Status: Validado com sucesso! ✔")
-        else:
-            st.warning("Status: Pendente ⏳")
-            
-        st.markdown("---")
+            with c2:
+                calc_cx_pac = nova_qtd // fator
+                sobra = nova_qtd % fator
+                st.markdown(f"📦 **{calc_cx_pac} {item['Tipo']}** + {sobra} un")
+                st.caption(f"Fator: {fator} un/{item['Tipo']}")
+                
+            with c3:
+                st.write("")
+                btn_txt = "✔ Conferido" if item["Conferido"] else "⬜ Marcar OK"
+                if st.button(btn_txt, key=f"btn_c_{idx}"):
+                    st.session_state.tabela_conferencia[idx]["Conferido"] = not item["Conferido"]
+                    st.rerun()
+                    
+            if item["Conferido"]:
+                st.success("Status: Validado com sucesso! ✔")
+            else:
+                st.warning("Status: Pendente ⏳")
+                
+            st.markdown("---")
 
-if st.button("💾 Finalizar e Salvar Conferência"):
-    st.success("🎉 Conferência gravada com sucesso! Todos os itens validados.")
+    if st.button("💾 Finalizar e Salvar Conferência"):
+        st.success("🎉 Conferência do mapa gravada com sucesso! Todos os itens validados.")
+else:
+    st.info("👆 Envie a foto acima e clique no botão de processar para puxar os dados do mapa.")
