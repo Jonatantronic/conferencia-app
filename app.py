@@ -1,13 +1,12 @@
-    import streamlit as st
+import streamlit as st
 import pandas as pd
-from PIL import Image
 
-st.set_page_config(page_title="Conferência de Mapas - Importação", page_icon="📁", layout="centered")
+st.set_page_config(page_title="Conferência de Mapas", page_icon="📁", layout="centered")
 
-st.markdown("## 📁 Painel de Conferência por Importação de Mapas")
-st.write("Envie arquivos PDF ou fotos dos mapas escaneados pelo seu telemóvel para fazer a conferência.")
+st.markdown("## 📁 Painel de Conferência de Mapas")
+st.write("Importe os PDFs ou fotos escaneadas dos mapas para iniciar a conferência.")
 
-# --- 1. IMPORTAÇÃO DE MÚLTIPLOS MAPAS (PDF ou FOTO) ---
+# 1. IMPORTAÇÃO DE MÚLTIPLOS MAPAS (PDF ou FOTO)
 st.subheader("1️⃣ Importar Mapas (PDF ou Imagem)")
 arquivos_enviados = st.file_uploader(
     "Selecione um ou vários mapas escaneados:", 
@@ -18,13 +17,12 @@ arquivos_enviados = st.file_uploader(
 if arquivos_enviados:
     st.success(f"📂 {len(arquivos_enviados)} mapa(s) importado(s) com sucesso!")
     
-    # Mostra uma prévia ou o nome dos arquivos carregados
     for arq in arquivos_enviados:
-        st.write(f"📄 **Arquivo carregado:** {arq.name}")
+        st.write(f"📄 **Arquivo:** {arq.name}")
 
     st.divider()
 
-    # --- 2. CONTROLE DA PLACA DO CAMINHÃO ---
+    # 2. CONTROLE DA PLACA DO CAMINHÃO
     st.subheader("2️⃣ Identificação do Veículo")
     col_p1, col_p2 = st.columns([2, 1])
 
@@ -50,7 +48,7 @@ if arquivos_enviados:
 
     st.divider()
 
-    # --- 3. CONVERSÃO AUTOMÁTICA DE CAIXAS / PACOTES ---
+    # 3. CONVERSÃO AUTOMÁTICA DE CAIXAS / PACOTES
     st.subheader("3️⃣ Conversão por Tipo de Embalagem")
     
     tipo_cerveja = st.selectbox(
@@ -85,7 +83,7 @@ if arquivos_enviados:
 
     st.divider()
 
-    # --- 4. CHECKLIST DO SEPARADOR E O V VERDE DO CONFERENTE ---
+    # 4. CHECKLIST DO SEPARADOR E O V VERDE DO CONFERENTE
     st.subheader("4️⃣ Conferência de Itens")
     st.write("O separador valida o que pegou. O conferente dá o **✔ verde** final.")
 
@@ -117,4 +115,4 @@ if arquivos_enviados:
     if st.button("💾 Finalizar Conferência Destes Mapas"):
         st.success("Conferência dos mapas salvos com sucesso!")
 else:
-    st.info("👆 Por favor,importe ao menos um mapa (PDF ou foto) para iniciar a conferência.")
+    st.info("👆 Por favor, importe ao menos um mapa escaneado (PDF ou foto) para iniciar.")
