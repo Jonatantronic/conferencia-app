@@ -7,14 +7,19 @@ st.set_page_config(page_title="Conferência de Mapas - WMS", page_icon="🍻", l
 st.markdown("## 🍻 Conferência de Mapas e Carga")
 st.write("Envie a foto do mapa para base visual e faça a conferência interativa dos itens.")
 
-# --- 1. VISUALIZAÇÃO DO MAPA BASE ---
+# --- 1. VISUALIZAÇÃO DO MAPA BASE (BLINDADO E CONVERTIDO PARA RGB) ---
 st.subheader("1️⃣ Mapa Base do Veículo")
-arquivo_mapa = st.file_uploader("Selecione a foto escaneada do mapa:", type=["png", "jpg", "jpeg"])
+arquivo_mapa = st.file_uploader("Selecione a foto escaneada do mapa:", type=["png", "jpg", "jpeg", "webp"])
 
 if arquivo_mapa is not None:
-    imagem_mapa = Image.open(arquivo_mapa)
-    st.image(imagem_mapa, caption="📄 Mapa de Separação em Consulta", use_column_width=True)
-    st.success("✅ Mapa carregado na tela como base!")
+    try:
+        imagem_mapa = Image.open(arquivo_mapa)
+        # Converte para RGB para evitar qualquer TypeError com perfis de cor do telemóvel
+        imagem_mapa = imagem_mapa.convert("RGB")
+        st.image(imagem_mapa, caption=f"📄 Mapa: {arquivo_mapa.name}", use_column_width=True)
+        st.success("✅ Mapa carregado na tela com sucesso!")
+    except Exception as e:
+        st.warning(f"⚠️ O arquivo '{arquivo_mapa.name}' foi enviado. A exibição visual direta falhou, mas a conferência abaixo está pronta para uso!")
 
 st.divider()
 
@@ -44,29 +49,23 @@ if placa_veiculo:
 
 st.divider()
 
-# --- 3. ITENS EXTRAÍDOS DO MAPA E CONVERSÃO AUTOMÁTICA ---
+# --- 3. ITENS E CONVERSÃO AUTOMÁTICA (PACOTES / CAIXAS) ---
 st.subheader("3️⃣ Conferência de Itens & Conversão Automática")
-st.write("O app puxa as unidades do mapa e converte direto para **Pacotes (PAC)** ou **Caixas (CX)**.")
+st.write("Insira as unidades lidas no mapa. O app converte automaticamente para **Pacotes (PAC)** ou **Caixas (CX)**.")
 
-# Inicializa os itens baseados no seu mapa (Ex: Itaipava 473ml com 571 un, etc.)
+# Inicializa os itens padrão baseados no seu fluxo de cervejas
 if "tabela_conferencia" not in st.session_state:
     st.session_state.tabela_conferencia = [
         {"Produto": "Cerveja Itaipava Pilsen Lata 473ml", "Unidades": 571, "Fator": 12, "Tipo": "PAC", "Conferido": False},
         {"Produto": "Cerveja Pilsen Lata 473ml (Local)", "Unidades": 278, "Fator": 12, "Tipo": "PAC", "Conferido": False},
-        {"Produto": "Cerveja 1000ml / 1L (Garrafa)", "Unidades": 120, "Fator": 12, "Tipo": "CX", "Conferido": False},
-        {"Produto": "Cerveja 600ml (Caixa)", "Unidades": 240, "Fator": 24, "Tipo": "CX", "Conferido": False},
+        {"Produto": "Cerveja 1000ml / 1L (Garrafa)", "Unidades": 12, "Fator": 12, "Tipo": "CX", "Conferido": False},
+        {"Produto": "Cerveja 600ml (Caixa)", "Unidades": 24, "Fator": 24, "Tipo": "CX", "Conferido": False},
     ]
 
-# Exibe cada item em uma linha interativa
+# Exibe cada item em uma linha interativa com botão de visto verde
 for idx, item in enumerate(st.session_state.tabela_conferencia):
-    # Cálculo automático da conversão
     total_un = item["Unidades"]
     fator = item["Fator"]
-    qtd_embalagem = total_un // fator
-    sobra_un = total_un % fator
-    
-    # Estilo visual se estiver conferido (Verde)
-    status_cor = "🟢 **CONFERIDO OK**" if item["Conferido"] else "⏳ Pendente"
     
     with st.container():
         st.markdown(f"### {idx+1}. {item['Produto']}")
@@ -74,12 +73,10 @@ for idx, item in enumerate(st.session_state.tabela_conferencia):
         col_dados1, col_dados2, col_dados3 = st.columns([1.5, 1.5, 1])
         
         with col_dados1:
-            # Permitir ajustar unidades caso precise bater com o mapa exato
             nova_qtd = st.number_input(f"Unidades (Mapa):", min_value=0, value=total_un, key=f"un_{idx}")
             st.session_state.tabela_conferencia[idx]["Unidades"] = nova_qtd
             
         with col_dados2:
-            # Exibe o resultado da conversão direto na tela
             calc_cx = nova_qtd // fator
             calc_sobra = nova_qtd % fator
             st.markdown(f"📦 **{calc_cx} {item['Tipo']}** + {calc_sobra} un")
@@ -88,17 +85,15 @@ for idx, item in enumerate(st.session_state.tabela_conferencia):
         with col_dados3:
             st.write("")
             st.write("")
-            # Botão de toque para mudar o status para verde / conferido
             btn_txt = "✔ Conferido" if item["Conferido"] else "⬜ Marcar OK"
             if st.button(btn_txt, key=f"btn_conf_{idx}"):
                 st.session_state.tabela_conferencia[idx]["Conferido"] = not item["Conferido"]
                 st.rerun()
                 
-        # Mostra o status atual da linha
         if item["Conferido"]:
-            st.success(f"Item {item['Produto']} validado com sucesso! ✔")
+            st.success(f"Item validado com sucesso! ✔")
         else:
-            st.info(f"Status: {status_cor}")
+            st.info("Status: ⏳ Pendente")
             
         st.markdown("---")
 
