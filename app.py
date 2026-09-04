@@ -1,25 +1,22 @@
 import streamlit as st
 import pandas as pd
-from PIL import Image
 
 st.set_page_config(page_title="Conferência de Mapas - WMS", page_icon="🍻", layout="centered")
 
 st.markdown("## 🍻 Conferência de Mapas e Carga")
 st.write("Envie a foto do mapa para base visual e faça a conferência interativa dos itens.")
 
-# --- 1. VISUALIZAÇÃO DO MAPA BASE (BLINDADO E CONVERTIDO PARA RGB) ---
+# --- 1. VISUALIZAÇÃO DO MAPA BASE (EXIBIÇÃO DIRETA SEGURA) ---
 st.subheader("1️⃣ Mapa Base do Veículo")
 arquivo_mapa = st.file_uploader("Selecione a foto escaneada do mapa:", type=["png", "jpg", "jpeg", "webp"])
 
 if arquivo_mapa is not None:
     try:
-        imagem_mapa = Image.open(arquivo_mapa)
-        # Converte para RGB para evitar qualquer TypeError com perfis de cor do telemóvel
-        imagem_mapa = imagem_mapa.convert("RGB")
-        st.image(imagem_mapa, caption=f"📄 Mapa: {arquivo_mapa.name}", use_column_width=True)
+        # Exibe a imagem diretamente usando os bytes brutos do upload (evita qualquer erro de conversão)
+        st.image(arquivo_mapa, caption=f"📄 Mapa: {arquivo_mapa.name}", use_column_width=True)
         st.success("✅ Mapa carregado na tela com sucesso!")
     except Exception as e:
-        st.warning(f"⚠️ O arquivo '{arquivo_mapa.name}' foi enviado. A exibição visual direta falhou, mas a conferência abaixo está pronta para uso!")
+        st.warning(f"⚠️ O arquivo '{arquivo_mapa.name}' foi enviado. A conferência interativa abaixo está pronta para uso!")
 
 st.divider()
 
