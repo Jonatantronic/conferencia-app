@@ -3,9 +3,10 @@ import pandas as pd
 
 st.set_page_config(page_title="Conferência de Carga", page_icon="🚚", layout="centered")
 
-st.markdown("## 🚚 Painel de Conferência de Carga")
+st.markdown("## 🚚 Painel de Conferência de Mapas")
+st.write("Controle de placas, conversão automática e crivo do conferente.")
 
-# --- 1. CONTROLE DO CAMINHÃO (PLACA) ---
+# --- 1. CONTROLE DO CAMINHÃO (PLACA COM BOTÃO VERDE) ---
 st.subheader("📋 Identificação do Veículo")
 col_p1, col_p2 = st.columns([2, 1])
 
@@ -19,75 +20,82 @@ with col_p2:
     st.write("") 
     st.write("")
     if placa_veiculo:
-        if st.button("🟢 Liberar Caminhão" if not st.session_state.caminhao_conferido else "✅ Caminhão Conferido"):
+        btn_label = "✅ Caminhão Conferido" if st.session_state.caminhao_conferido else "🟢 Marcar Caminhão OK"
+        if st.button(btn_label):
             st.session_state.caminhao_conferido = not st.session_state.caminhao_conferido
 
 if placa_veiculo:
     if st.session_state.caminhao_conferido:
-        st.success(f"Caminhão **{placa_veiculo}** totalmente conferido e liberado! ✅")
+        st.success(f"Veículo **{placa_veiculo}** conferido e com liberação verde! 🟢✅")
     else:
-        st.warning(f"Caminhão **{placa_veiculo}** aguardando conferência final.")
+        st.warning(f"Veículo **{placa_veiculo}** aguardando sinalização.")
 
 st.divider()
 
-# --- 2. CONFIGURAÇÃO DOS TIPOS DE EMBALAGEM ---
-st.subheader("📦 Regras de Conversão Automática")
-tipo_produto = st.selectbox(
-    "Selecione o tipo de produto do mapa:",
+# --- 2. CONVERSÃO AUTOMÁTICA POR TIPO DE EMBALAGEM ---
+st.subheader("📦 Conversão Automática de Unidades")
+
+tipo_cerveja = st.selectbox(
+    "Selecione o tipo de embalagem/produto:",
     [
-        "Cerveja 473ml (12 un/pacote)", 
-        "Cerveja 600ml (24 un/caixa)", 
-        "Cerveja 1000ml (12 un/caixa)", 
-        "Outro / Padrão Logístico"
+        "Cerveja 473ml (Fardo/PAC com 12 unidades)", 
+        "Cerveja 600ml (Caixa com 24 unidades)", 
+        "Cerveja 1000ml / 1L (Caixa com 12 unidades)", 
+        "Outro Padrão / Palete"
     ]
 )
 
-if "473ml" in tipo_produto:
-    fator = 12
-    unidade_medida = "Pacotes (PAC)"
-elif "600ml" in tipo_produto:
-    fator = 24
-    unidade_medida = "Caixas (CX)"
-elif "1000ml" in tipo_produto:
-    fator = 12
-    unidade_medida = "Caixas (CX)"
+if "473ml" in tipo_cerveja:
+    fator_conversao = 12
+    nome_pacote = "Pacotes (PAC)"
+elif "600ml" in tipo_cerveja:
+    fator_conversao = 24
+    nome_pacote = "Caixas (CX)"
+elif "1000ml" in tipo_cerveja:
+    fator_conversao = 12
+    nome_pacote = "Caixas (CX)"
 else:
-    fator = st.number_input("Informe o fator personalizado:", min_value=1, value=242)
-    unidade_medida = "Unidades/Padrão"
+    fator_conversao = st.number_input("Fator personalizado:", min_value=1, value=242)
+    nome_pacote = "Unidades/Padrão"
 
-total_unidades_lido = st.number_input("Quantidade Total em Unidades:", min_value=0, value=288, step=1)
+total_unidades = st.number_input("Quantidade Total em Unidades (no mapa):", min_value=0, value=288, step=1)
 
-if fator > 0:
-    qtd_embalagem = total_unidades_lido // fator
-    sobra_unidades = total_unidades_lido % fator
-    st.info(f"📊 **Conversão:** {qtd_embalagem} {unidade_medida} e {sobra_unidades} unidades soltas.")
+if fator_conversao > 0:
+    qtd_caixas_pac = total_unidades // fator_conversao
+    sobra_unidades = total_unidades % fator_conversao
+    st.info(f"📊 **Resultado da Conversão:** **{qtd_caixas_pac} {nome_pacote}** e **{sobra_unidades} unidades** soltas.")
 
 st.divider()
 
-# --- 3. ITENS DO MAPA: SEPARADOR E CONFERENTE ---
-st.subheader("🔍 Checklist de Itens do Mapa")
+# --- 3. CHECKLIST DO MAPA: SEPARADOR E O V VERDE DO CONFERENTE ---
+st.subheader("🔍 Conferência de Itens do Mapa")
+st.write("O separador marca o que pegou. O conferente clica na coluna para gerar o **✔ verde**.")
 
-if "dados_tabela" not in st.session_state:
-    st.session_state.dados_tabela = pd.DataFrame([
-        {"Item": "Cerveja 473ml - Fardo 12un", "Qtd Un": 120, "Separador OK": False, "Conferente OK": False},
-        {"Item": "Cerveja 600ml - Caixa 24un", "Qtd Un": 240, "Separador OK": False, "Conferente OK": False},
-        {"Item": "Cerveja 1000ml - Caixa 12un", "Qtd Un": 144, "Separador OK": False, "Conferente OK": False},
+if "tabela_mapa" not in st.session_state:
+    st.session_state.tabela_mapa = pd.DataFrame([
+        {"Produto": "Cerveja 473ml", "Qtd Total": 120, "Separador": False, "Conferente_OK": False},
+        {"Produto": "Cerveja 600ml", "Qtd Total": 240, "Separador": False, "Conferente_OK": False},
+        {"Produto": "Cerveja 1000ml", "Qtd Total": 144, "Separador": False, "Conferente_OK": False},
     ])
 
-for i, row in st.session_state.dados_tabela.iterrows():
-    col_item, col_sep, col_conf = st.columns([3, 1, 1])
+for idx, row in st.session_state.tabela_mapa.iterrows():
+    c1, c2, c3 = st.columns([2, 1, 1])
     
-    with col_item:
-        st.markdown(f"**{row['Item']}**<br><small>Qtd: {row['Qtd Un']} un</small>", unsafe_allow_html=True)
+    with c1:
+        st.markdown(f"**{row['Produto']}**<br><small>Total: {row['Qtd Total']} un</small>", unsafe_allow_html=True)
         
-    with col_sep:
-        sep_status = st.checkbox("Separado", value=row["Separador OK"], key=f"sep_{i}")
-        st.session_state.dados_tabela.at[i, "Separador OK"] = sep_status
+    with c2:
+        sep_val = st.checkbox("Separado", value=row["Separador"], key=f"sep_{idx}")
+        st.session_state.tabela_mapa.at[idx, "Separador"] = sep_val
         
-    with col_conf:
-        conf_status = st.checkbox("✔", value=row["Conferente OK"], key=f"conf_{i}")
-        st.session_state.dados_tabela.at[i, "Conferente OK"] = conf_status
+    with c3:
+        conf_val = st.checkbox("✔ OK", value=row["Conferente_OK"], key=f"conf_{idx}")
+        st.session_state.tabela_mapa.at[idx, "Conferente_OK"] = conf_val
+        if conf_val:
+            st.markdown("<span style='color:green; font-weight:bold;'>✔ Validado</span>", unsafe_allow_html=True)
 
 st.divider()
-if st.button("💾 Salvar Conferência"):
-    st.success("Conferência registrada com sucesso!")
+
+if st.button("💾 Concluir e Salvar Conferência do Mapa"):
+    st.success("Mapa conferido e salvo com sucesso! Pronto para o próximo.")
+
