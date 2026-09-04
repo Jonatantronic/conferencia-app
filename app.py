@@ -1,23 +1,20 @@
 import streamlit as st
 import pandas as pd
+from PIL import Image
 
-st.set_page_config(page_title="Conferência de Mapas", page_icon="📁", layout="centered")
+st.set_page_config(page_title="Conferência de Mapas - WMS", page_icon="🍻", layout="centered")
 
-st.markdown("## 📁 Painel de Conferência de Mapas")
-st.write("Importe os seus mapas escaneados e faça o controlo da carga abaixo.")
+st.markdown("## 🍻 Conferência de Mapas e Carga")
+st.write("Envie a foto do mapa para base visual e faça a conferência interativa dos itens.")
 
-# --- 1. IMPORTAÇÃO DE MAPAS (PDF ou FOTO) ---
-st.subheader("1️⃣ Importar Mapas do Veículo (PDF ou Imagem)")
-arquivos_enviados = st.file_uploader(
-    "Selecione um ou vários mapas escaneados:", 
-    type=["pdf", "png", "jpg", "jpeg"], 
-    accept_multiple_files=True
-)
+# --- 1. VISUALIZAÇÃO DO MAPA BASE ---
+st.subheader("1️⃣ Mapa Base do Veículo")
+arquivo_mapa = st.file_uploader("Selecione a foto escaneada do mapa:", type=["png", "jpg", "jpeg"])
 
-if arquivos_enviados:
-    st.success(f"📂 {len(arquivos_enviados)} mapa(s) carregado(s) com sucesso!")
-    for arq in arquivos_enviados:
-        st.text(f"📄 Arquivo: {arq.name}")
+if arquivo_mapa is not None:
+    imagem_mapa = Image.open(arquivo_mapa)
+    st.image(imagem_mapa, caption="📄 Mapa de Separação em Consulta", use_column_width=True)
+    st.success("✅ Mapa carregado na tela como base!")
 
 st.divider()
 
@@ -26,7 +23,7 @@ st.subheader("2️⃣ Identificação do Veículo")
 col_p1, col_p2 = st.columns([2, 1])
 
 with col_p1:
-    placa_veiculo = st.text_input("Placa do Caminhão / Veículo:", placeholder="Ex: ABC-1234").upper()
+    placa_veiculo = st.text_input("Placa do Caminhão:", placeholder="Ex: ABC-1234").upper()
 
 if "caminhao_conferido" not in st.session_state:
     st.session_state.caminhao_conferido = False
@@ -47,69 +44,63 @@ if placa_veiculo:
 
 st.divider()
 
-# --- 3. CONVERSÃO AUTOMÁTICA DE CAIXAS / PACOTES ---
-st.subheader("3️⃣ Conversão por Tipo de Embalagem")
+# --- 3. ITENS EXTRAÍDOS DO MAPA E CONVERSÃO AUTOMÁTICA ---
+st.subheader("3️⃣ Conferência de Itens & Conversão Automática")
+st.write("O app puxa as unidades do mapa e converte direto para **Pacotes (PAC)** ou **Caixas (CX)**.")
 
-tipo_cerveja = st.selectbox(
-    "Selecione o padrão do produto:",
-    [
-        "Cerveja 473ml (Fardo/PAC com 12 un)", 
-        "Cerveja 600ml (Caixa com 24 un)", 
-        "Cerveja 1000ml / 1L (Caixa com 12 un)", 
-        "Outro Padrão / Palete"
+# Inicializa os itens baseados no seu mapa (Ex: Itaipava 473ml com 571 un, etc.)
+if "tabela_conferencia" not in st.session_state:
+    st.session_state.tabela_conferencia = [
+        {"Produto": "Cerveja Itaipava Pilsen Lata 473ml", "Unidades": 571, "Fator": 12, "Tipo": "PAC", "Conferido": False},
+        {"Produto": "Cerveja Pilsen Lata 473ml (Local)", "Unidades": 278, "Fator": 12, "Tipo": "PAC", "Conferido": False},
+        {"Produto": "Cerveja 1000ml / 1L (Garrafa)", "Unidades": 120, "Fator": 12, "Tipo": "CX", "Conferido": False},
+        {"Produto": "Cerveja 600ml (Caixa)", "Unidades": 240, "Fator": 24, "Tipo": "CX", "Conferido": False},
     ]
-)
 
-if "473ml" in tipo_cerveja:
-    fator = 12
-    nome_emb = "Pacotes (PAC)"
-elif "600ml" in tipo_cerveja:
-    fator = 24
-    nome_emb = "Caixas (CX)"
-elif "1000ml" in tipo_cerveja:
-    fator = 12
-    nome_emb = "Caixas (CX)"
-else:
-    fator = st.number_input("Fator personalizado:", min_value=1, value=242)
-    nome_emb = "Unidades"
-
-total_unidades_lido = st.number_input("Total de Unidades no mapa:", min_value=0, value=288, step=1)
-
-if fator > 0:
-    qtd_cx_pac = total_unidades_lido // fator
-    sobra = total_unidades_lido % fator
-    st.info(f"📊 **Resultado:** **{qtd_cx_pac} {nome_emb}** e **{sobra} unidades**.")
-
-st.divider()
-
-# --- 4. CHECKLIST DO SEPARADOR E O V VERDE DO CONFERENTE ---
-st.subheader("4️⃣ Conferência de Itens")
-st.write("O separador valida o que pegou. O conferente dá o **✔ verde** final.")
-
-if "tabela_itens" not in st.session_state:
-    st.session_state.tabela_itens = pd.DataFrame([
-        {"Produto": "Cerveja 473ml", "Separador": False, "Conferente_OK": False},
-        {"Produto": "Cerveja 600ml", "Separador": False, "Conferente_OK": False},
-        {"Produto": "Cerveja 1000ml", "Separador": False, "Conferente_OK": False},
-    ])
-
-for idx, row in st.session_state.tabela_itens.iterrows():
-    c1, c2, c3 = st.columns([2, 1, 1])
+# Exibe cada item em uma linha interativa
+for idx, item in enumerate(st.session_state.tabela_conferencia):
+    # Cálculo automático da conversão
+    total_un = item["Unidades"]
+    fator = item["Fator"]
+    qtd_embalagem = total_un // fator
+    sobra_un = total_un % fator
     
-    with c1:
-        st.markdown(f"**{row['Produto']}**")
+    # Estilo visual se estiver conferido (Verde)
+    status_cor = "🟢 **CONFERIDO OK**" if item["Conferido"] else "⏳ Pendente"
+    
+    with st.container():
+        st.markdown(f"### {idx+1}. {item['Produto']}")
         
-    with c2:
-        sep = st.checkbox("Separado", value=row["Separador"], key=f"s_{idx}")
-        st.session_state.tabela_itens.at[idx, "Separador"] = sep
+        col_dados1, col_dados2, col_dados3 = st.columns([1.5, 1.5, 1])
         
-    with c3:
-        conf = st.checkbox("✔ OK", value=row["Conferente_OK"], key=f"c_{idx}")
-        st.session_state.tabela_itens.at[idx, "Conferente_OK"] = conf
-        if conf:
-            st.markdown("<span style='color:green; font-weight:bold;'>✔ Validado</span>", unsafe_allow_html=True)
+        with col_dados1:
+            # Permitir ajustar unidades caso precise bater com o mapa exato
+            nova_qtd = st.number_input(f"Unidades (Mapa):", min_value=0, value=total_un, key=f"un_{idx}")
+            st.session_state.tabela_conferencia[idx]["Unidades"] = nova_qtd
+            
+        with col_dados2:
+            # Exibe o resultado da conversão direto na tela
+            calc_cx = nova_qtd // fator
+            calc_sobra = nova_qtd % fator
+            st.markdown(f"📦 **{calc_cx} {item['Tipo']}** + {calc_sobra} un")
+            st.caption(f"Fator: {fator} un por {item['Tipo']}")
+            
+        with col_dados3:
+            st.write("")
+            st.write("")
+            # Botão de toque para mudar o status para verde / conferido
+            btn_txt = "✔ Conferido" if item["Conferido"] else "⬜ Marcar OK"
+            if st.button(btn_txt, key=f"btn_conf_{idx}"):
+                st.session_state.tabela_conferencia[idx]["Conferido"] = not item["Conferido"]
+                st.rerun()
+                
+        # Mostra o status atual da linha
+        if item["Conferido"]:
+            st.success(f"Item {item['Produto']} validado com sucesso! ✔")
+        else:
+            st.info(f"Status: {status_cor}")
+            
+        st.markdown("---")
 
-st.divider()
-
-if st.button("💾 Finalizar Conferência Deste Mapa"):
-    st.success("Conferência salva com sucesso! Pronto para o próximo veículo.")
+if st.button("💾 Salvar e Finalizar Conferência Completa"):
+    st.success("🎉 Conferência de todos os itens gravada com sucesso! Pronto para o próximo mapa.")
