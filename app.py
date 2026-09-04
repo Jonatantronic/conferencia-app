@@ -1,135 +1,129 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Conferência WMS - Logística", page_icon="📦", layout="centered")
+st.set_page_config(page_title="Conferência de Mapas", page_icon="📦", layout="centered")
 
-st.markdown("## 📦 Sistema de Conferência de Carga")
-st.write("Gerencie seu banco de dados de fatores, envie a foto do mapa e faça a conferência com conversão automática.")
+# Limpa qualquer memória antiga ao iniciar do zero
+if "reset_inicial" not in st.session_state:
+    st.session_state.clear()
+    st.session_state.reset_inicial = True
 
-# --- 1. BANCO DE DADOS DE PRODUTOS E FATORES ---
-st.subheader("1️⃣ Banco de Dados de Fatores (Embalagens)")
-st.write("Cadastre aqui os produtos e quantas unidades formam uma caixa ou pacote para a conversão automática.")
+st.markdown("## 📦 Conferência de Carga por Mapa")
+st.write("Cadastre seus fatores, envie a foto do mapa e faça a conferência com conversão automática.")
 
-# Inicializa o banco de dados na sessão
+# --- 1. BANCO DE DADOS DE FATORES ---
+st.subheader("1️⃣ Banco de Dados de Embalagens (Fatores)")
+st.write("Cadastre o produto e quantas unidades vão em cada caixa ou pacote.")
+
 if "banco_fatores" not in st.session_state:
-    st.session_state.banco_fatores = {
-        "Cerveja Itaipava Pilsen Lata 473ml": {"fator": 12, "tipo": "PAC"},
-        "Cerveja Pilsen Lata 473ml (Local)": {"fator": 12, "tipo": "PAC"},
-        "Cerveja 600ml (Garrafa)": {"fator": 24, "tipo": "CX"},
-        "Cerveja 1000ml / 1L": {"fator": 12, "tipo": "CX"}
-    }
+    st.session_state.banco_fatores = {}
 
-# Formulário para cadastrar novo produto no banco de dados
-with st.expander("➕ Cadastrar Novo Produto no Banco de Dados"):
-    novo_nome_prod = st.text_input("Nome do Produto:", placeholder="Ex: Cerveja Malzbier 350ml")
-    c_f1, c_f2 = st.columns(2)
-    with c_f1:
-        novo_fator_val = st.number_input("Quantidade por Caixa/Pacote:", min_value=1, value=12)
-    with c_f2:
-        novo_tipo_embalagem = st.selectbox("Tipo de Embalagem:", ["PAC", "CX"])
+with st.expander("➕ Cadastrar Novo Produto e Fator"):
+    prod_nome = st.text_input("Nome do Produto:", placeholder="Ex: Cerveja Lata 473ml")
+    c1, c2 = st.columns(2)
+    with c1:
+        prod_fator = st.number_input("Unidades por Caixa/Pacote:", min_value=1, value=12)
+    with c2:
+        prod_tipo = st.selectbox("Tipo:", ["PAC", "CX"])
         
-    if st.button("Salvar Produto no Banco"):
-        if novo_nome_prod:
-            st.session_state.banco_fatores[novo_nome_prod] = {
-                "fator": novo_fator_val,
-                "tipo": novo_tipo_embalagem
-            }
-            st.success(f"Produto '{novo_nome_prod}' cadastrado com sucesso!")
+    if st.button("Salvar no Banco de Dados"):
+        if prod_nome:
+            st.session_state.banco_fatores[prod_nome] = {"fator": prod_fator, "tipo": prod_tipo}
+            st.success(f"'{prod_nome}' cadastrado com sucesso!")
             st.rerun()
         else:
             st.warning("Digite o nome do produto.")
 
-# Exibe os produtos já cadastrados
-st.caption(f"Produtos cadastrados no sistema: {len(st.session_state.banco_fatores)}")
+# Mostra os produtos já cadastrados pelo usuário
+if len(st.session_state.banco_fatores) > 0:
+    st.write("Produtos cadastrados:")
+    for p, inf in st.session_state.banco_fatores.items():
+        st.caption(f"• **{p}**: {inf['fator']} un por {inf['tipo']}")
+else:
+    st.info("Nenhum produto cadastrado ainda. Cadastre acima para usar na conversão.")
 
 st.divider()
 
 # --- 2. UPLOAD DA FOTO DO MAPA ---
 st.subheader("2️⃣ Upload da Foto do Mapa")
-arquivo_foto = st.file_uploader("Envie a foto ou arquivo do mapa para conferência:", type=["png", "jpg", "jpeg", "webp"])
+foto_mapa = st.file_uploader("Envie a foto do mapa para conferência:", type=["png", "jpg", "jpeg", "webp"])
 
-if arquivo_foto is not None:
-    try:
-        st.image(arquivo_foto, caption=f"📄 Mapa Carregado: {arquivo_foto.name}", use_column_width=True)
-        st.success("✅ Foto carregada para consulta visual!")
-    except:
-        st.warning("⚠️ Arquivo recebido.")
+if foto_mapa is not None:
+    st.image(foto_mapa, caption="📄 Mapa enviado", use_column_width=True)
+    st.success("Foto carregada com sucesso!")
 
 st.divider()
 
 # --- 3. LISTA DE CONFERÊNCIA E CONVERSÃO ---
-st.subheader("3️⃣ Lista de Conferência & Conversão Automática")
-st.write("Adicione os itens do mapa, informe as unidades totais e marque os itens conferidos.")
+st.subheader("3️⃣ Lista de Conferência do Mapa")
 
-# Inicializa a lista de itens da conferência atual
 if "lista_conferencia" not in st.session_state:
-    st.session_state.lista_conferencia = [
-        {"Produto": "Cerveja Itaipava Pilsen Lata 473ml", "Unidades": 571, "Conferido": False},
-        {"Produto": "Cerveja Pilsen Lata 473ml (Local)", "Unidades": 278, "Conferido": False}
-    ]
+    st.session_state.lista_conferencia = []
 
-# Adicionar item à conferência puxando do banco de dados
-with st.expander("➕ Adicionar Item à Conferência do Mapa"):
+# Adicionar item à conferência
+with st.expander("➕ Adicionar Item para Conferir"):
     if len(st.session_state.banco_fatores) > 0:
-        produto_selecionado = st.selectbox("Selecione o Produto Cadastrado:", list(st.session_state.banco_fatores.keys()))
-        qtd_informada = st.number_input("Total de Unidades no Mapa:", min_value=1, value=100, key="qtd_mapa_add")
+        item_escolhido = st.selectbox("Selecione o Produto:", list(st.session_state.banco_fatores.keys()), key="sel_prod")
+        qtd_mapa = st.number_input("Unidades totais no mapa:", min_value=1, value=100, key="qtd_mapa")
         
-        if st.button("Inserir na Lista de Conferência"):
+        if st.button("Adicionar à Lista de Conferência"):
             st.session_state.lista_conferencia.append({
-                "Produto": produto_selecionado,
-                "Unidades": qtd_informada,
-                "Conferido": False
+                "produto": item_escolhido,
+                "unidades": qtd_mapa,
+                "conferido": False
             })
-            st.success("Item adicionado à lista!")
+            st.success("Item adicionado!")
             st.rerun()
     else:
-        st.warning("Cadastre produtos no banco de dados acima primeiro.")
+        st.warning("Cadastre pelo menos um produto no Banco de Dados (Passo 1) antes de adicionar itens.")
 
 st.write("---")
 
-# Exibe a lista interativa de conferência com conversão e botão verde
-for idx, item in enumerate(st.session_state.lista_conferencia):
-    nome_prod = item["Produto"]
-    total_unidades = item["Unidades"]
-    
-    # Busca o fator correspondente no banco de dados cadastrado lá em cima
-    dados_prod = st.session_state.banco_fatores.get(nome_prod, {"fator": 12, "tipo": "PAC"})
-    fator = dados_prod["fator"]
-    tipo = dados_prod["tipo"]
-    
-    with st.container():
-        # Se estiver conferido, destaca o título em verde
-        status_cor = "🟢" if item["Conferido"] else "📦"
-        st.markdown(f"**{status_cor} Item {idx+1}: {nome_prod}**")
+# Exibe a lista de itens limpa e interativa
+if len(st.session_state.lista_conferencia) > 0:
+    for i, item in enumerate(st.session_state.lista_conferencia):
+        p_nome = item["produto"]
+        p_unidades = item["unidades"]
         
-        col_c1, col_c2, col_c3 = st.columns([1.2, 1.3, 1])
+        # Pega o fator cadastrado
+        dados = st.session_state.banco_fatores.get(p_nome, {"fator": 12, "tipo": "PAC"})
+        fator = dados["fator"]
+        tipo = dados["tipo"]
         
-        with col_c1:
-            nova_qtd = st.number_input("Unidades:", min_value=0, value=total_unidades, key=f"qtd_conf_{idx}")
-            st.session_state.lista_conferencia[idx]["Unidades"] = nova_qtd
+        with st.container():
+            status_icone = "🟢" if item["conferido"] else "📦"
+            st.markdown(f"**{status_icone} Item {i+1}: {p_nome}**")
             
-        with col_c2:
-            # Cálculo da conversão automática solicitada
-            qtd_caixas_pacotes = nova_qtd // fator
-            sobra_unidades = nova_qtd % fator
-            st.markdown(f"📊 **{qtd_caixas_pacotes} {tipo}** + {sobra_unidades} un")
-            st.caption(f"Fator base: {fator} un/{tipo}")
+            col_a, col_b, col_c = st.columns([1.2, 1.3, 1])
             
-        with col_c3:
-            st.write("")
-            # Botão de conferência com inversão de cor e estado
-            if item["Conferido"]:
-                if st.button("✅ Conferido", key=f"btn_status_{idx}Type"):
-                    st.session_state.lista_conferencia[idx]["Conferido"] = False
-                    st.rerun()
-                st.success("OK ✔")
-            else:
-                if st.button("⬜ Marcar OK", key=f"btn_status_{idx}Type"):
-                    st.session_state.lista_conferencia[idx]["Conferido"] = True
-                    st.rerun()
-                st.warning("Pendente ⏳")
+            with col_a:
+                nova_qtd = st.number_input("Unidades:", min_value=0, value=p_unidades, key=f"q_{i}")
+                st.session_state.lista_conferencia[i]["unidades"] = nova_qtd
                 
-        st.markdown("---")
-
-if st.button("💾 Finalizar e Salvar Conferência do Mapa"):
-    st.success("🎉 Conferência gravada e validada com sucesso!")
+            with col_b:
+                # Conversão automática solicitada
+                qtd_convertida = nova_qtd // fator
+                sobra = nova_qtd % fator
+                st.markdown(f"📊 **{qtd_convertida} {tipo}** + {sobra} un")
+                st.caption(f"Fator: {fator} un/{tipo}")
+                
+            with col_c:
+                st.write("")
+                # Botão de visto verde / OK
+                if item["conferido"]:
+                    if st.button("✅ Conferido", key=f"btn_{i}"):
+                        st.session_state.lista_conferencia[i]["conferido"] = False
+                        st.rerun()
+                    st.success("OK ✔")
+                else:
+                    if st.button("⬜ Marcar OK", key=f"btn_{i}"):
+                        st.session_state.lista_conferencia[i]["conferido"] = True
+                        st.rerun()
+                    st.warning("Pendente ⏳")
+                    
+            st.markdown("---")
+            
+    if st.button("💾 Finalizar Conferência"):
+        st.success("🎉 Conferência salva com sucesso!")
+else:
+    st.info("Nenhum item adicionado à conferência ainda. Use a opção acima para incluir os itens do mapa.")
