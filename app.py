@@ -2,71 +2,98 @@ import streamlit as st
 import pandas as pd
 from PIL import Image
 import re
+import subprocess
+import os
 
-st.set_page_config(page_title="Conferência de Mapas - WMS", page_icon="📦", layout="centered")
+# Garante que o tesseract-ocr esteja disponível no ambiente Linux da nuvem
+try:
+    import pytesseract
+except ImportError:
+    os.system("apt-get update && apt-get install -y tesseract-ocr tesseract-ocr-por")
+    import pytesseract
 
-st.markdown("## 📦 Leitor Inteligente de Mapas e Carga")
-st.write("Envie a foto do mapa. O app lê os dados reais da imagem, puxa a placa e gera a conferência.")
+st.set_page_config(page_title="Conferência Real de Mapas - WMS", page_icon="📦", layout="centered")
+
+st.markdown("## 📦 Leitor OCR Real de Mapas e Carga")
+st.write("Envie a foto do mapa. O app lê o texto da imagem, extrai a placa e todos os itens reais para conferência.")
 
 # --- 1. UPLOAD DA FOTO DO MAPA ---
 st.subheader("1️⃣ Enviar Foto ou PDF do Mapa")
-arquivo_subido = st.file_uploader("Selecione o arquivo do mapa:", type=["png", "jpg", "jpeg", "webp", "pdf"])
+arquivo_subido = st.file_uploader("Selecione a foto escaneada do mapa:", type=["png", "jpg", "jpeg", "webp"])
 
-# Função para tentar extrair texto e dados reais da imagem enviada
-def extrair_dados_do_mapa(arquivo):
-    placa_detectada = "ABC-1234" # Padrão inicial
-    itens_lidos = []
-    
+# Função que lê o texto real de dentro da foto usando OCR
+def ler_texto_da_foto(imagem_arquivo):
     try:
-        # Abre a imagem com o Pillow para leitura
-        img = Image.open(arquivo)
-        
-        # Simulação de OCR inteligente adaptado ao seu layout logístico de mapas:
-        # O app analisa o arquivo enviado para capturar dinamicamente os textos da imagem
-        nome_arquivo = arquivo.name.upper()
-        
-        # Exemplo dinâmico baseado na leitura real do documento enviado
-        placa_detectada = "IPA-2026" # Extraído automaticamente do cabeçalho do mapa
-        
-        itens_lidos = [
-            {"Produto": "Cerveja Itaipava Pilsen Lata 473ml", "Unidades": 571, "Fator": 12, "Tipo": "PAC", "Conferido": False},
-            {"Produto": "Cerveja Pilsen Lata 473ml (Local)", "Unidades": 278, "Fator": 12, "Tipo": "PAC", "Conferido": False}
-        ]
+        img = Image.open(imagem_arquivo)
+        # Executa OCR em português para ler perfeitamente o texto da foto
+        texto_extraido = pytesseract.image_to_string(img, lang='por')
+        return texto_extraido
     except Exception as e:
-        # Fallback seguro caso a imagem exija processamento avançado
-        placa_detectada = "CAM-0000"
-        itens_lidos = [
-            {"Produto": "Item extraído do mapa enviado", "Unidades": 100, "Fator": 12, "Tipo": "PAC", "Conferido": False}
-        ]
-        
-    return placa_detectada, itens_lidos
+        return f"Erro ao ler imagem: {str(e)}"
 
+# Se houver arquivo, mostra a imagem e o botão de leitura
 if arquivo_subido is not None:
     try:
         st.image(arquivo_subido, caption=f"📄 Mapa: {arquivo_subido.name}", use_column_width=True)
     except:
         pass
         
-    # Botão para processar e puxar os dados reais da foto
-    if st.button("🔍 Ler Placa e Itens Direto da Foto", type="primary"):
-        placa_extraida, itens_extraidos = extrair_dados_do_mapa(arquivo_subido)
-        st.session_state.placa_mapeada = placa_extraida
-        st.session_state.tabela_conferencia = itens_extraidos
-        st.success("✅ Dados, placa e quantidades extraídos com sucesso da foto do mapa!")
-        st.rerun()
+    if st.button("🔍 Ler Texto, Placa e Itens da Foto (OCR)", type="primary"):
+        with st.spinner("Lendo o mapa enviado... Aguarde um instante."):
+            texto_lido = ler_texto_da_foto(arquivo_subido)
+            
+            # 1. Tenta achar a placa do caminhão (padrões comuns como ABC1D23, ABC-1234, etc.)
+            padrao_placa = re.search(r'([A-Z]{3}[0-9][A-Z0-9][0-9]{2})|([A-Z]{3}-[0-9]{4})', texto_lido.upper())
+            placa_encontrada = padrao_placa.group(0) if padrao_placa else "NÃO DETECTADA"
+            st.session_state.placa_mapeada = placa_encontrada
+            
+            # 2. Processa as linhas do texto lido da foto para extrair os produtos e quantidades
+            linhas = texto_lido.split("\n")
+            itens_extraidos = []
+            
+            for linha in linhas:
+                linha_limpa = linha.strip()
+                if len(linha_limpa) > 3:
+                    # Procura números na linha que representem quantidades (2 a 4 dígitos)
+                    numeros = re.findall(r'\b\d{2,4}\b', linha_limpa)
+                    if numeros:
+                        qtd = int(numeros[-1])
+                        # Define fator e tipo com base no texto da linha
+                        fator = 12 if "473" in linha_limpa or "1000" in linha_limpa or "1L" in linha_limpa.upper() else 24
+                        tipo = "PAC" if "LATA" in linha_limpa.upper() or "473" in linha_limpa else "CX"
+                        
+                        itens_extraidos.append({
+                            "Produto": linha_limpa,
+                            "Unidades": qtd,
+                            "Fator": fator,
+                            "Tipo": tipo,
+                            "Conferido": False
+                        })
+            
+            # Se o OCR encontrou itens, salva na sessão. Se não achou por conta da qualidade da foto, exibe o texto bruto para conferência manual rápida
+            if itens_extraidos:
+                st.session_state.tabela_conferencia = itens_extraidos
+                st.success("✅ Leitura concluída com sucesso direto do mapa!")
+            else:
+                st.session_state.tabela_conferencia = [
+                    {"Produto": f"Texto Lido: {texto_lido[:50]}...", "Unidades": 100, "Fator": 12, "Tipo": "PAC", "Conferido": False}
+                ]
+                st.warning("⚠️ A foto foi lida, mas os itens precisam de ajuste fino. Edite as unidades abaixo.")
+            
+            st.rerun()
 
 st.divider()
 
-# --- 2. IDENTIFICAÇÃO AUTOMÁTICA DA PLACA DO CAMINHÃO ---
-st.subheader("2️⃣ Placa do Veículo (Extraída do Mapa)")
+# --- 2. IDENTIFICAÇÃO DA PLACA EXTRAÍDA DO MAPA ---
+st.subheader("2️⃣ Placa do Veículo (Lida do Mapa)")
 
 placa_atual = st.session_state.get("placa_mapeada", "")
-placa_veiculo = st.text_input("Placa do Caminhão (Detectada automaticamente):", value=placa_atual).upper()
+placa_veiculo = st.text_input("Placa Detectada no Mapa:", value=placa_atual).upper()
 
 if "caminhao_conferido" not in st.session_state:
     st.session_state.caminhao_conferido = False
 
-if placa_veiculo:
+if placa_veiculo and placa_veiculo != "NÃO DETECTADA":
     col_v1, col_v2 = st.columns([2, 1])
     with col_v1:
         if st.session_state.caminhao_conferido:
@@ -81,11 +108,11 @@ if placa_veiculo:
 
 st.divider()
 
-# --- 3. LISTA DE CONFERÊNCIA COM CONVERSÃO AUTOMÁTICA ---
+# --- 3. LISTA DE CONFERÊNCIA COM OS DADOS REAIS DA FOTO ---
 st.subheader("3️⃣ Conferência de Itens & Conversão Automática")
 
 if "tabela_conferencia" in st.session_state and len(st.session_state.tabela_conferencia) > 0:
-    st.write("Confira as quantidades lidas da foto, veja a conversão e toque no botão para marcar como **✔ Conferido**.")
+    st.write("Estes são os itens extraídos diretamente do seu mapa. Confira as unidades, veja a conversão e toque no botão para marcar como **✔ Conferido**.")
     
     for idx, item in enumerate(st.session_state.tabela_conferencia):
         total_un = item["Unidades"]
@@ -123,4 +150,4 @@ if "tabela_conferencia" in st.session_state and len(st.session_state.tabela_conf
     if st.button("💾 Finalizar e Salvar Conferência"):
         st.success("🎉 Conferência gravada com sucesso! Todos os itens validados.")
 else:
-    st.info("👆 Envie a foto do mapa acima e clique em **'Ler Placa e Itens Direto da Foto'** para carregar os dados reais.")
+    st.info("👆 Envie a foto do mapa acima e clique no botão **'Ler Texto, Placa e Itens da Foto (OCR)'** para extrair os dados reais do papel.")
