@@ -1,6 +1,4 @@
-                            "Produto": linha_limpa,
-                            "Unidades": qtd,
-                            "Fator": fator,import streamlit as st
+import streamlit as st
 import pandas as pd
 
 st.set_page_config(page_title="Conferência de Mapas - WMS", page_icon="📦", layout="centered")
@@ -51,14 +49,12 @@ st.divider()
 st.subheader("3️⃣ Itens do Mapa & Conversão Automática")
 st.write("Adicione os itens que constam no mapa enviado, ajuste as unidades e marque o visto verde.")
 
-# Inicializa a lista de itens da sessão
 if "lista_itens" not in st.session_state:
     st.session_state.lista_itens = [
         {"Produto": "Cerveja Itaipava Pilsen Lata 473ml", "Unidades": 571, "Fator": 12, "Tipo": "PAC", "Conferido": False},
         {"Produto": "Cerveja Pilsen Lata 473ml (Local)", "Unidades": 278, "Fator": 12, "Tipo": "PAC", "Conferido": False},
     ]
 
-# Formulário rápido para adicionar novo item caso o mapa traga outros produtos
 with st.expander("➕ Adicionar Novo Item do Mapa"):
     novo_prod = st.text_input("Descrição do Produto:", placeholder="Ex: Cerveja 600ml")
     col_n1, col_n2, col_n3 = st.columns(3)
@@ -85,7 +81,6 @@ with st.expander("➕ Adicionar Novo Item do Mapa"):
 
 st.write("---")
 
-# Exibe cada item interativo com conversão e botão de visto verde
 for idx, item in enumerate(st.session_state.lista_itens):
     total_un = item["Unidades"]
     fator = item["Fator"]
@@ -121,9 +116,3 @@ for idx, item in enumerate(st.session_state.lista_itens):
 
 if st.button("💾 Finalizar e Salvar Conferência Completa"):
     st.success("🎉 Conferência gravada com sucesso! Todos os itens validados.")
-
-                            "Tipo": tipo,
-                            "Conferido": False
-                        })
-            
-            # Se o OCR encontrou itens, salva na sessão. Se não achou por conta da qualidade da foto, exibe o texto brut
