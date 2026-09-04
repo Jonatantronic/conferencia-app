@@ -1,26 +1,27 @@
-import streamlit as st
+    import streamlit as st
 import pandas as pd
 from PIL import Image
 
-st.set_page_config(page_title="Conferência de Mapas por Foto", page_icon="📷", layout="centered")
+st.set_page_config(page_title="Conferência de Mapas - Importação", page_icon="📁", layout="centered")
 
-st.markdown("## 📷 Conferência de Mapas via Foto")
-st.write("Tire a foto do mapa impresso do veículo. O app vai ler a imagem e estruturar a conferência.")
+st.markdown("## 📁 Painel de Conferência por Importação de Mapas")
+st.write("Envie arquivos PDF ou fotos dos mapas escaneados pelo seu telemóvel para fazer a conferência.")
 
-# --- 1. CAPTURA DA FOTO DO MAPA PELO CELULAR ---
-st.subheader("1️⃣ Enviar Foto do Mapa do Veículo")
-foto_mapa = st.camera_input("Tirar foto do mapa de separação")
+# --- 1. IMPORTAÇÃO DE MÚLTIPLOS MAPAS (PDF ou FOTO) ---
+st.subheader("1️⃣ Importar Mapas (PDF ou Imagem)")
+arquivos_enviados = st.file_uploader(
+    "Selecione um ou vários mapas escaneados:", 
+    type=["pdf", "png", "jpg", "jpeg"], 
+    accept_multiple_files=True
+)
 
-# Caso prefira carregar da galeria se já tirou antes:
-if foto_mapa is None:
-    foto_mapa = st.file_uploader("Ou escolha a foto da galeria:", type=["jpg", "jpeg", "png"])
-
-if foto_mapa is not None:
-    imagem = Image.open(foto_mapa)
-    st.image(imagem, caption="Mapa capturado para leitura", use_column_width=True)
+if arquivos_enviados:
+    st.success(f"📂 {len(arquivos_enviados)} mapa(s) importado(s) com sucesso!")
     
-    st.success("📸 Foto recebida com sucesso! Processando os dados do mapa...")
-    
+    # Mostra uma prévia ou o nome dos arquivos carregados
+    for arq in arquivos_enviados:
+        st.write(f"📄 **Arquivo carregado:** {arq.name}")
+
     st.divider()
 
     # --- 2. CONTROLE DA PLACA DO CAMINHÃO ---
@@ -75,7 +76,7 @@ if foto_mapa is not None:
         fator = st.number_input("Fator personalizado:", min_value=1, value=242)
         nome_emb = "Unidades"
 
-    total_unidades_lido = st.number_input("Total de Unidades extraídas do mapa:", min_value=0, value=288, step=1)
+    total_unidades_lido = st.number_input("Total de Unidades no mapa:", min_value=0, value=288, step=1)
 
     if fator > 0:
         qtd_cx_pac = total_unidades_lido // fator
@@ -90,9 +91,9 @@ if foto_mapa is not None:
 
     if "tabela_itens" not in st.session_state:
         st.session_state.tabela_itens = pd.DataFrame([
-            {"Produto": "Cerveja 473ml", "Qtd": 120, "Separador": False, "Conferente_OK": False},
-            {"Produto": "Cerveja 600ml", "Qtd Total": 240, "Separador": False, "Conferente_OK": False},
-            {"Produto": "Cerveja 1000ml", "Qtd Total": 144, "Separador": False, "Conferente_OK": False},
+            {"Produto": "Cerveja 473ml", "Separador": False, "Conferente_OK": False},
+            {"Produto": "Cerveja 600ml", "Separador": False, "Conferente_OK": False},
+            {"Produto": "Cerveja 1000ml", "Separador": False, "Conferente_OK": False},
         ])
 
     for idx, row in st.session_state.tabela_itens.iterrows():
@@ -113,5 +114,7 @@ if foto_mapa is not None:
 
     st.divider()
 
-    if st.button("💾 Finalizar Conferência Deste Mapa"):
-        st.success("Conferência salva com sucesso! Pode fotografar o próximo mapa.")
+    if st.button("💾 Finalizar Conferência Destes Mapas"):
+        st.success("Conferência dos mapas salvos com sucesso!")
+else:
+    st.info("👆 Por favor,importe ao menos um mapa (PDF ou foto) para iniciar a conferência.")
